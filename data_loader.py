@@ -5,7 +5,6 @@ import shutil
 import pandas as pd
 import numpy as np
 import torch
-import gradio as gr
 from PIL import Image, ImageFile
 from sklearn.utils import shuffle
 from torchvision import datasets, transforms
@@ -16,11 +15,7 @@ import torch.nn as nn
 # Data Loaders
 # --------------------------------
 
-# This helper function extracts the zip file provided for images to a custom path as the user requests on the frontend or into a C: drive temp file
-# Input: File and custom path
-# Output: The unzipped file st the custom path or at the C: drive
 def extract_zip_to_tempdir(file_like, custom_path=None):
-
     if custom_path:
         os.makedirs(custom_path, exist_ok=True)
         temp_dir = tempfile.mkdtemp(dir=custom_path)
@@ -32,9 +27,6 @@ def extract_zip_to_tempdir(file_like, custom_path=None):
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# This helper function checks if any images are corrupted. To prevent a crash it skips them and makes a info bubble. 
-# Input: Path and number of channels of the images
-# Output: Info bubble if corrupt image
 def safe_pil_loader(path, num_channels=3):
     try:
         with open(path, 'rb') as f:
@@ -43,41 +35,32 @@ def safe_pil_loader(path, num_channels=3):
             img.load()
             return img
     except Exception as e:
-        gr.Info(f"Skipping corrupted image: {path} — {e}")
+        print(f"Skipping corrupted image: {path} — {e}")
         return None
 
-# This class safely loads images from a folder, skipping invalid or unreadable files.
-# Input: root (dataset folder path), transform (optional image transforms), num_channels (number of image channels)
-# Output: Filters out invalid images during dataset initialization, ensuring only valid samples are used.
 class SafeImageFolder(datasets.ImageFolder):
     def __init__(self, root, transform=None, num_channels=3):
         loader_with_channels = lambda path: safe_pil_loader(path, num_channels)
         super().__init__(root, transform=transform, loader=loader_with_channels)
         
-        before = len(self.samples)
         self.samples = [s for s in self.samples if loader_with_channels(s[0]) is not None]
-        after = len(self.samples)
         self.imgs = self.samples
 
     def __getitem__(self, index):
         path, target = self.samples[index]
         img = self.loader(path)
         if img is None:
-            gr.Warning(f"Could not load image at {path}")
+            print(f"Warning: Could not load image at {path}")
         if self.transform is not None:
             img = self.transform(img)
         return img, target
 
-# This function loads data. It calls the helper functions and loads clean, uncorrupted data. 
-# Input: file, custom_path=None, batch_size=32, image_size=28,  num_channels=3, loss_fn=None
-# Output: Clean data ready for training
-def load_data(file, custom_path=None, batch_size=32, image_size=28,  num_channels=3, loss_fn=None):
+def load_data(file, custom_path=None, batch_size=32, image_size=28, num_channels=3, loss_fn=None):
     ext = os.path.splitext(file)[1].lower()
     if ext == ".csv":
-
         df = pd.read_csv(file)
         if 'y' not in df.columns:
-            gr.Warning("CSV must contain a 'y' column.")
+            print("Warning: CSV must contain a 'y' column.")
         
         X = df.drop(columns=['y']).values.astype(np.float32)
         if isinstance(loss_fn, nn.CrossEntropyLoss):
@@ -85,7 +68,7 @@ def load_data(file, custom_path=None, batch_size=32, image_size=28,  num_channel
         elif isinstance(loss_fn, (nn.MSELoss, nn.BCEWithLogitsLoss)):
             y = df['y'].values.astype(np.float32)
         else:
-            gr.Warning(f"Unhandled loss function type: {type(loss_fn)}")
+            print(f"Warning: Unhandled loss function type: {type(loss_fn)}")
     
         X, y = shuffle(X, y)
 
@@ -110,5 +93,4 @@ def load_data(file, custom_path=None, batch_size=32, image_size=28,  num_channel
             "path": data_dir
         }
     else:
-        gr.Warning("Unsupported file format. Provide a .csv or .zip path.")
-
+        print("Warning: Unsupported file format. Provide a .csv or .zip path.")

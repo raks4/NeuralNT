@@ -5,22 +5,14 @@ from matplotlib.animation import FFMpegWriter
 from sklearn.decomposition import PCA
 import tempfile
 import torch
-import gradio as gr
 
 # --------------------------------
 # Graph Functions
 # --------------------------------
 
-
-# This function flattens the model parameters into a vector which then appears as a ball on the 3d plot. 
-# Input: model
-# Output: flattened parameters
 def get_flat_weights(model):
     return torch.cat([p.detach().flatten() for p in model.parameters()])
 
-# This function plots the 2d graph showing the loss history of the model.
-# Input: Loss_history
-# Output: A 2d graph showing the loss history per epoch
 def generate_loss_plot(loss_history):
     fig, ax = plt.subplots()
     ax.plot(loss_history)
@@ -33,18 +25,13 @@ def generate_loss_plot(loss_history):
     plt.close(fig)
     return tmpfile.name
 
-# This function generates the 3d video of teh loss
-# Input: weight_path, loss_history, output_path, target_frames=300, frame_rate=10
-# Output: A video showing the function descending to a minima or a warning
 def generate_3d_animation_pca(weight_path, loss_history, output_path, target_frames=300, frame_rate=10):
-
     if len(loss_history) == 0 or np.any(np.isnan(loss_history)):
-        gr.Warning("❌ loss_history is empty or contains NaNs — cannot animate.")
+        print("Warning: loss_history is empty or contains NaNs — cannot animate.")
         return
 
     if len(weight_path) < target_frames:
         target_frames = len(weight_path)
-
 
     indices = np.linspace(0, len(weight_path) - 1, target_frames).astype(int)
     weight_path_sampled = weight_path[indices]
@@ -71,16 +58,15 @@ def generate_3d_animation_pca(weight_path, loss_history, output_path, target_fra
     def update(i):
         point.set_data([reduced[i, 0]], [reduced[i, 1]])
         point.set_3d_properties([interpolated_loss[i]])
-        return point,
+        return (point,)
 
     interval = 1000 / frame_rate  
     ani = animation.FuncAnimation(
         fig, update,
         frames=target_frames,
         interval=interval,
-        blit=True
+        blit=False
     )
-
 
     writer = FFMpegWriter(
         fps=frame_rate,
@@ -91,5 +77,4 @@ def generate_3d_animation_pca(weight_path, loss_history, output_path, target_fra
 
     ani.save(output_path, writer=writer)
     plt.close(fig)
-
     return output_path

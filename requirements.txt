@@ -1,6 +1,9 @@
 torch
-gradio
 numpy
 pandas
 scikit-learn
 matplotlib
+fastapi
+uvicorn
+python-multipart
+py-cpuinfo
